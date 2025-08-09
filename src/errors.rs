@@ -17,6 +17,7 @@ pub enum Error {
     PlayStreamError(String),
     StreamError(String),
     RandomError(String),
+    RuntimeError(String),
     SupportedStreamConfigsError(String),
 }
 pub type Result<T> = std::result::Result<T, Error>;
@@ -38,6 +39,7 @@ impl Display for Error {
                 Error::PlayStreamError(e) => e.to_string(),
                 Error::StreamError(e) => e.to_string(),
                 Error::RandomError(e) => e.to_string(),
+                Error::RuntimeError(e) => e.to_string(),
                 Error::SupportedStreamConfigsError(e) => e.to_string(),
             }
         )
@@ -100,5 +102,11 @@ impl From<SupportedStreamConfigsError> for Error {
 impl From<rand::distr::uniform::Error> for Error {
     fn from(e: rand::distr::uniform::Error) -> Self {
         Error::RandomError(e.to_string())
+    }
+}
+
+impl From<ctrlc::Error> for Error {
+    fn from(e: ctrlc::Error) -> Self {
+        Error::RuntimeError(e.to_string())
     }
 }

@@ -34,29 +34,30 @@ pub struct Cli {
 
     #[arg(
         short,
-        long = "execution timeout (seconds)",
-        default_value = "360000"
+        long = "execution timeout (seconds)"
     )]
     timeout_secs: Option<u64>,
 
     #[arg(
+        short = 'm',
         long,
         help = "minimum of pulse duration",
-        default_value = "30"
+        default_value = "240"
     )]
     min_duration: u64,
 
     #[arg(
+        short = 'M',
         long,
         help = "maximum of pulse duration",
-        default_value = "180"
+        default_value = "720"
     )]
     max_duration: u64,
 
-    #[arg(short, long, help="beginning of frequency range", default_value = "3000.0", value_parser = valid_frequency_range)]
+    #[arg(short, long, help="beginning of frequency range", default_value = "9000.0", value_parser = valid_frequency_range)]
     beg_frequency: f64,
 
-    #[arg(short, long, help="end of frequency range", default_value = "18000.0", value_parser = valid_frequency_range)]
+    #[arg(short, long, help="end of frequency range", default_value = "22000.0", value_parser = valid_frequency_range)]
     end_frequency: f64,
 
     #[arg(
@@ -139,6 +140,11 @@ impl Cli {
     }
 
     pub fn dispatch() -> Result<()> {
+        ctrlc::set_handler(|| {
+            eprintln!("\rExitting due to Ctrl-C");
+            std::process::exit(201);
+        })?;
+
         let args = Self::parse();
 
         if args.list {
@@ -177,29 +183,50 @@ pub fn list_devices(_: &Cli) -> Result<()> {
 pub fn play(op: &Cli) -> Result<()> {
     let mut rng = op.rng();
     let device = op.device()?;
-
     let started = Instant::now();
     let config = device.default_output_config()?;
     let duration_range = op.duration_range()?;
     let frequency_range = op.frequency_range()?;
+    eprintln!(
+        "setting system volume"
+    );
+    set_volume();
 
     loop {
         let config = config.clone();
         let frequency = frequency_range.sample(&mut rng);
-        let duration = Duration::from_millis(duration_range.sample(&mut rng));
-        match config.sample_format() {
+        let millis = duration_range.sample(&mut rng);
+        let duration = Duration::from_millis(millis);
+        let result = match config.sample_format() {
             cpal::SampleFormat::F32 =>
                 counter::<f32>(&device, &config.into(), duration, frequency),
             cpal::SampleFormat::F64 =>
                 counter::<f64>(&device, &config.into(), duration, frequency),
             sample_format => panic!("Unsupported sample format '{sample_format}'"),
-        }?;
+        };
+
+        match result {
+            Ok(_) => {},
+            Err(error) => {
+                eprintln!(
+                    "WARNING: playing frequency {frequency}hz for {millis}ms: {error}"
+                );
+                eprintln!(
+                    "WARNING: resetting system volume"
+                );
+                set_volume();
+            },
+        }
         if let Some(duration) = &op.timeout_secs {
             if (Instant::now() - started).as_secs() > *duration {
-                break
+                break;
             }
         }
     }
 
     Ok(())
+}
+
+pub fn set_volume() {
+    cpvc::set_system_volume(100);
 }

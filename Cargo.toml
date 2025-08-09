@@ -1,6 +1,6 @@
 [package]
 name = "faloops"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = """
 Counter-attack nonhuman bad actors that abuse Frequency-shift Keying and Phase-shift Keying in your human environment thusly soothing your temporal and occipital lobes.
